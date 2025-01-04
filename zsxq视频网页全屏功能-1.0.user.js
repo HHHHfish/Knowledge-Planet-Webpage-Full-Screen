@@ -15,7 +15,7 @@
     window.addEventListener('load', () => {
         // 创建一个全屏按钮
         const fullScreenButton = document.createElement('button');
-        fullScreenButton.innerText = '全屏'; // 设置按钮文本为“全屏”
+        fullScreenButton.innerText = '全屏'; // 设置按钮文本为"全屏"
         fullScreenButton.style.position = 'fixed'; // 固定按钮位置
         fullScreenButton.style.top = '10px'; // 距离顶部10像素
         fullScreenButton.style.right = '10px'; // 距离右侧10像素
@@ -137,6 +137,14 @@
             const videoContainer = document.querySelector('.video-container');
             const videoElement = videoContainer ? videoContainer.querySelector('video') : null;
 
+            // 添加长按检测
+            if ((event.key === 'ArrowRight' || event.key === 'ArrowLeft') && !event.repeat) {
+                // 记录原始播放速度
+                if (videoElement) {
+                    videoElement._originalPlaybackRate = videoElement.playbackRate;
+                }
+            }
+
             if (event.key === 'Escape') {
                 if (videoContainer && videoContainer._isPseudoFullScreen) {
                     exitPseudoFullScreen(videoContainer); // 退出伪全屏
@@ -152,15 +160,38 @@
                     }
                 }
             } else if (event.key === 'ArrowRight') { // 右箭头键快进
-                event.preventDefault(); // 阻止默认行为（如滚动）
+                event.preventDefault();
                 if (videoElement) {
-                    videoElement.currentTime += 5; // 快进10秒
+                    if (event.repeat) {
+                        // 长按右键时设置3倍速
+                        videoElement.playbackRate = 3.0;
+                    } else {
+                        // 短按保持原有的快进功能
+                        videoElement.currentTime += 5;
+                    }
                 }
             } else if (event.key === 'ArrowLeft') { // 左箭头键快退
-                event.preventDefault(); // 阻止默认行为（如滚动）
+                event.preventDefault();
                 if (videoElement) {
-                    videoElement.currentTime -= 5; // 快退10秒
+                    if (event.repeat) {
+                        // 长按左键时设置3倍速
+                        videoElement.playbackRate = 3.0;
+                    } else {
+                        // 短按保持原有的快退功能
+                        videoElement.currentTime -= 5;
+                    }
                 }
+            }
+        });
+
+        // 添加键盘松开事件监听
+        window.addEventListener('keyup', (event) => {
+            const videoContainer = document.querySelector('.video-container');
+            const videoElement = videoContainer ? videoContainer.querySelector('video') : null;
+
+            if ((event.key === 'ArrowRight' || event.key === 'ArrowLeft') && videoElement) {
+                // 恢复原始播放速度
+                videoElement.playbackRate = videoElement._originalPlaybackRate || 1.0;
             }
         });
     });
