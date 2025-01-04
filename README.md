@@ -26,19 +26,107 @@
 
     // 等待页面加载完成
     window.addEventListener('load', () => {
+        // 添加提示框和按钮样式
+        const style = document.createElement('style');
+        style.textContent = `
+            .video-toast {
+                position: fixed;
+                top: 10%;
+                left: 50%;
+                transform: translate(-50%, 0);
+                background-color: rgba(0, 0, 0, 0.7);
+                color: white;
+                padding: 10px 20px;
+                border-radius: 4px;
+                z-index: 10000;
+                pointer-events: none;
+                transition: opacity 0.3s;
+                opacity: 0;
+                font-size: 14px;
+            }
+            .video-toast.show {
+                opacity: 1;
+            }
+            .fullscreen-btn {
+                position: fixed;
+                top: 10px;
+                right: 10px;
+                z-index: 9999;
+                background-color: rgba(0, 123, 255, 0.8);
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                cursor: pointer;
+                border-radius: 4px;
+                font-size: 14px;
+                transition: all 0.3s ease;
+                display: flex;
+                align-items: center;
+                gap: 5px;
+            }
+            .fullscreen-btn:hover {
+                background-color: rgba(0, 98, 204, 0.9);
+                transform: scale(1.05);
+            }
+            .fullscreen-btn:active {
+                transform: scale(0.95);
+            }
+            .fullscreen-btn::before {
+                content: '⤢';
+                font-size: 16px;
+            }
+        `;
+        document.head.appendChild(style);
+
+        // 添加防抖函数
+        let toastTimeout = null;
+        let currentToast = null;
+
+        function showToast(message, duration = 2000) {
+            // 如果已经存在toast，先清除它
+            if (currentToast) {
+                currentToast.remove();
+            }
+            // 清除未完成的定时器
+            if (toastTimeout) {
+                clearTimeout(toastTimeout);
+            }
+
+            const toast = document.createElement('div');
+            toast.className = 'video-toast';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            currentToast = toast;
+
+            // 强制重绘
+            toast.offsetHeight;
+            toast.classList.add('show');
+
+            toastTimeout = setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => {
+                    toast.remove();
+                    currentToast = null;
+                }, 300);
+            }, duration);
+        }
+
+        // 添加节流函数
+        function throttle(func, limit) {
+            let inThrottle;
+            return function (...args) {
+                if (!inThrottle) {
+                    func.apply(this, args);
+                    inThrottle = true;
+                    setTimeout(() => inThrottle = false, limit);
+                }
+            }
+        }
+
         // 创建一个全屏按钮
         const fullScreenButton = document.createElement('button');
-        fullScreenButton.innerText = '全屏'; // 设置按钮文本为"全屏"
-        fullScreenButton.style.position = 'fixed'; // 固定按钮位置
-        fullScreenButton.style.top = '10px'; // 距离顶部10像素
-        fullScreenButton.style.right = '10px'; // 距离右侧10像素
-        fullScreenButton.style.zIndex = '9999'; // 设置z-index确保按钮在最上层
-        fullScreenButton.style.backgroundColor = '#007BFF'; // 设置背景颜色为蓝色
-        fullScreenButton.style.color = '#fff'; // 设置文字颜色为白色
-        fullScreenButton.style.border = 'none'; // 去掉边框
-        fullScreenButton.style.padding = '10px'; // 设置内边距
-        fullScreenButton.style.cursor = 'pointer'; // 设置鼠标悬停时的光标样式为指针
-        fullScreenButton.style.borderRadius = '5px'; // 设置圆角
+        fullScreenButton.className = 'fullscreen-btn';
+        fullScreenButton.innerText = '全屏';
 
         // 将按钮添加到页面
         document.body.appendChild(fullScreenButton);
@@ -67,7 +155,7 @@
                     width: videoContainer._processingElement.style.width,
                     height: videoContainer._processingElement.style.height
                 };
-                videoContainer._processingElement.remove(); // 移除 processing 元素以便重新设置样式
+                videoContainer._processingElement.remove();
             }
 
             // 设置新的样式以覆盖整个页面
@@ -78,15 +166,15 @@
             videoContainer.style.bottom = '0';
             videoContainer.style.width = '100vw';
             videoContainer.style.height = '100vh';
-            videoContainer.style.backgroundColor = 'black'; // 设置背景颜色为黑色
-            videoContainer.style.zIndex = '9998'; // 确保容器在最上层
-            videoContainer.style.overflow = 'hidden'; // 防止内容溢出
+            videoContainer.style.backgroundColor = 'black';
+            videoContainer.style.zIndex = '9998';
+            videoContainer.style.overflow = 'hidden';
 
             // 设置 processing 元素的样式
             if (videoContainer._processingElement) {
                 videoContainer._processingElement.style.setProperty('width', '100%', 'important');
                 videoContainer._processingElement.style.setProperty('height', '100%', 'important');
-                videoContainer.appendChild(videoContainer._processingElement); // 将 processing 元素添加回容器
+                videoContainer.appendChild(videoContainer._processingElement);
             }
 
             // 禁用 body 滚动
@@ -105,7 +193,6 @@
                 videoContainer.style.zIndex = videoContainer._originalStyles.zIndex;
                 videoContainer.style.overflow = videoContainer._originalStyles.overflow;
 
-                // 清除保存的原始样式
                 delete videoContainer._originalStyles;
             }
 
@@ -121,38 +208,39 @@
             document.body.style.overflow = originalBodyOverflow;
         };
 
+        // 对快进快退操作进行节流处理
+        const throttledShowToast = throttle(showToast, 200);
+
         // 监听全屏按钮的点击事件
         fullScreenButton.addEventListener('click', () => {
-            // 找到包含视频的容器元素
             const videoContainer = document.querySelector('.video-container');
-            // 得到videoContainer的第一个子盒子
             const processingElement = videoContainer.querySelector('.processing');
-            console.log(processingElement);
-            if (videoContainer) {
-                // 切换伪全屏状态
-                if (!videoContainer._isPseudoFullScreen) {
-                    enterPseudoFullScreen(videoContainer); // 进入伪全屏
-                    // 移除.processing样式
 
-                    // processingElement.classList.remove('processing');
-                    videoContainer._isPseudoFullScreen = true; // 标记为伪全屏状态
+            if (videoContainer) {
+                if (!videoContainer._isPseudoFullScreen) {
+                    enterPseudoFullScreen(videoContainer);
+                    videoContainer._isPseudoFullScreen = true;
+                    showToast('进入全屏 (按ESC退出)');
+                    fullScreenButton.innerText = '退出全屏';
                 } else {
-                    exitPseudoFullScreen(videoContainer); // 退出伪全屏
-                    videoContainer._isPseudoFullScreen = false; // 取消伪全屏标记
+                    exitPseudoFullScreen(videoContainer);
+                    videoContainer._isPseudoFullScreen = false;
+                    showToast('退出全屏');
+                    fullScreenButton.innerText = '全屏';
                 }
             } else {
-                console.error('没有找到视频盒子'); // 如果未找到视频容器，输出错误信息
+                console.error('没有找到视频盒子');
+                showToast('错误：未找到视频');
             }
         });
 
-        // 监听键盘事件，按下 Esc 键退出全屏
+        // 监听键盘事件
         window.addEventListener('keydown', (event) => {
             const videoContainer = document.querySelector('.video-container');
             const videoElement = videoContainer ? videoContainer.querySelector('video') : null;
 
             // 添加长按检测
             if ((event.key === 'ArrowRight' || event.key === 'ArrowLeft') && !event.repeat) {
-                // 记录原始播放速度
                 if (videoElement) {
                     videoElement._originalPlaybackRate = videoElement.playbackRate;
                 }
@@ -160,38 +248,42 @@
 
             if (event.key === 'Escape') {
                 if (videoContainer && videoContainer._isPseudoFullScreen) {
-                    exitPseudoFullScreen(videoContainer); // 退出伪全屏
-                    videoContainer._isPseudoFullScreen = false; // 取消伪全屏标记
+                    exitPseudoFullScreen(videoContainer);
+                    videoContainer._isPseudoFullScreen = false;
+                    showToast('退出全屏');
+                    fullScreenButton.innerText = '全屏';
                 }
-            } else if (event.key === ' ') { // 空格键暂停/播放
-                event.preventDefault(); // 阻止默认行为（如滚动）
+            } else if (event.key === ' ') {
+                event.preventDefault();
                 if (videoElement) {
                     if (videoElement.paused) {
                         videoElement.play();
+                        showToast('播放');
                     } else {
                         videoElement.pause();
+                        showToast('暂停');
                     }
                 }
-            } else if (event.key === 'ArrowRight') { // 右箭头键快进
+            } else if (event.key === 'ArrowRight') {
                 event.preventDefault();
                 if (videoElement) {
                     if (event.repeat) {
-                        // 长按右键时设置3倍速
                         videoElement.playbackRate = 3.0;
+                        throttledShowToast('3倍速播放中');
                     } else {
-                        // 短按保持原有的快进功能
                         videoElement.currentTime += 5;
+                        throttledShowToast('快进 5 秒');
                     }
                 }
-            } else if (event.key === 'ArrowLeft') { // 左箭头键快退
+            } else if (event.key === 'ArrowLeft') {
                 event.preventDefault();
                 if (videoElement) {
                     if (event.repeat) {
-                        // 长按左键时设置3倍速
                         videoElement.playbackRate = 3.0;
+                        throttledShowToast('3倍速播放中');
                     } else {
-                        // 短按保持原有的快退功能
                         videoElement.currentTime -= 5;
+                        throttledShowToast('快退 5 秒');
                     }
                 }
             }
@@ -203,8 +295,8 @@
             const videoElement = videoContainer ? videoContainer.querySelector('video') : null;
 
             if ((event.key === 'ArrowRight' || event.key === 'ArrowLeft') && videoElement) {
-                // 恢复原始播放速度
                 videoElement.playbackRate = videoElement._originalPlaybackRate || 1.0;
+                showToast('恢复正常速度');
             }
         });
     });
