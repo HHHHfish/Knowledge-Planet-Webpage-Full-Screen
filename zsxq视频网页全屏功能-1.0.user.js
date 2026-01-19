@@ -16,33 +16,31 @@
     const MEMORY_ENABLED_KEY = 'zsxq_fullscreen_memory_enabled';
     const FIRST_TIME_NOTICE_KEY = 'zsxq_fullscreen_first_time_notice_shown';
 
-    // ================== 使用说明内容 ==================
-    function getUsageInstructions() {
-        return {
-            console: `
+    // 打印使用说明
+    console.log(`
 === zsxq视频网页全屏功能使用说明 ===
 版本: 1.1
 
 【基本功能】
-    • 点击"全屏"按钮可进入/退出网页全屏模式
-    • 按ESC键可退出全屏模式
-    • 空格键可播放/暂停视频
+• 点击"全屏"按钮可进入/退出网页全屏模式
+• 按ESC键可退出全屏模式
+• 空格键可播放/暂停视频
 
 【按钮操作】
-    • 左键拖拽：移动全屏按钮位置
-    • 右键点击：打开上下文菜单
-    • 双击：无特殊操作（避免误触）
+• 左键拖拽：移动全屏按钮位置
+• 右键点击：打开上下文菜单
+• 双击：无特殊操作（避免误触）
 
 【上下文菜单功能】
 • 记忆位置：启用/禁用按钮位置记忆功能
-    - 启用后：刷新页面会保持按钮位置
-    - 禁用后：刷新页面按钮回到默认位置（右上角）
+  - 启用后：刷新页面会保持按钮位置
+  - 禁用后：刷新页面按钮回到默认位置（右上角）
 
 【键盘快捷键】
 • 方向键左右：
-    - 短按：快进/快退5秒
-    - 长按（300ms以上）：3倍速播放
-    - 松开：恢复正常速度
+  - 短按：快进/快退5秒
+  - 长按（300ms以上）：3倍速播放
+  - 松开：恢复正常速度
 
 【重要提示】
 • 按钮位置记忆功能默认处于关闭状态！
@@ -52,54 +50,7 @@
 • 拖拽按钮时点击不会触发全屏功能
 
 如有问题，请检查控制台日志。
-==================================`,
-            html: `
-<p><strong>【基本功能】</strong></p>
-<ul>
-    <li>点击"全屏"按钮可进入/退出网页全屏模式</li>
-    <li>按ESC键可退出全屏模式</li>
-    <li>空格键可播放/暂停视频</li>
-</ul>
-
-<p><strong>【按钮操作】</strong></p>
-<ul>
-    <li>左键拖拽：移动全屏按钮位置</li>
-    <li>右键点击：打开上下文菜单</li>
-    <li>双击：无特殊操作（避免误触）</li>
-</ul>
-
-<p><strong>【上下文菜单功能】</strong></p>
-<ul>
-    <li>记忆位置：启用/禁用按钮位置记忆功能
-        <ul>
-            <li>启用后：刷新页面会保持按钮位置</li>
-            <li>禁用后：刷新页面按钮回到默认位置（右上角）</li>
-        </ul>
-    </li>
-</ul>
-
-<p><strong>【键盘快捷键】</strong></p>
-<ul>
-    <li>方向键左右：
-        <ul>
-            <li>短按：快进/快退5秒</li>
-            <li>长按（300ms以上）：3倍速播放</li>
-            <li>松开：恢复正常速度</li>
-        </ul>
-    </li>
-</ul>
-
-<p><strong>【重要提示】</strong></p>
-<ul>
-    <li>按钮位置记忆功能默认处于关闭状态！</li>
-    <li>如需启用记忆功能，请右键点击按钮并选择"记忆位置"</li>
-    <li>该工具仅供学习使用</li>
-</ul>`
-        };
-    }
-
-    // 打印使用说明
-    console.log(getUsageInstructions().console);
+==================================`);
 
     // ================== 首次使用提示对话框 ==================
     function showFirstTimeNotice() {
@@ -153,10 +104,52 @@
 
         // 使用说明内容
         const content = document.createElement('div');
-        content.innerHTML = getUsageInstructions().html;
+        content.innerHTML = `
+            <p><strong>【基本功能】</strong></p>
+            <ul>
+                <li>点击"全屏"按钮可进入/退出网页全屏模式</li>
+                <li>按ESC键可退出全屏模式</li>
+                <li>空格键可播放/暂停视频</li>
+            </ul>
+            
+            <p><strong>【按钮操作】</strong></p>
+            <ul>
+                <li>左键拖拽：移动全屏按钮位置</li>
+                <li>右键点击：打开上下文菜单</li>
+                <li>双击：无特殊操作（避免误触）</li>
+            </ul>
+            
+            <p><strong>【上下文菜单功能】</strong></p>
+            <ul>
+                <li>记忆位置：启用/禁用按钮位置记忆功能
+                    <ul style="margin-top: 8px; margin-bottom: 8px;">
+                        <li>启用后：刷新页面会保持按钮位置</li>
+                        <li>禁用后：刷新页面按钮回到默认位置（右上角）</li>
+                    </ul>
+                </li>
+            </ul>
+            
+            <p><strong>【键盘快捷键】</strong></p>
+            <ul>
+                <li>方向键左右：
+                    <ul style="margin-top: 8px; margin-bottom: 8px;">
+                        <li>短按：快进/快退5秒</li>
+                        <li>长按（300ms以上）：3倍速播放</li>
+                        <li>松开：恢复正常速度</li>
+                    </ul>
+                </li>
+            </ul>
+            
+            <p><strong>【重要提示】</strong></p>
+            <ul>
+                <li>按钮位置记忆功能默认处于关闭状态！</li>
+                <li>如需启用记忆功能，请右键点击按钮并选择"记忆位置"</li>
+                <li>该工具仅供学习使用</li>
+            </ul>
+        `;
         content.style.cssText = `
             font-size: 14px;
-            line-height: 1.5;
+            line-height: 1.6;
             color: #555;
         `;
 
