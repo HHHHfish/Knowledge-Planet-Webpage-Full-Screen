@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         zsxq视频网页全屏功能
 // @namespace    http://tampermonkey.net/
-// @version      1.1
+// @version      1.2
 // @description  为zsxq视频网站添加一个网页全屏的功能
 // @author       You
 // @match        *://wx.zsxq.com/*
@@ -16,10 +16,33 @@
     const MEMORY_ENABLED_KEY = 'zsxq_fullscreen_memory_enabled';
     const FIRST_TIME_NOTICE_KEY = 'zsxq_fullscreen_first_time_notice_shown';
 
+    // 日志控制开关
+    let logEnabled = false;
+
+    // 暴露日志控制函数到全局作用域
+    window.toggleZsxqLog = function (enable) {
+        if (enable === 1) {
+            logEnabled = true;
+            console.log('[zsxq全屏] 日志输出已启用');
+        } else if (enable === 0) {
+            logEnabled = false;
+            console.log('[zsxq全屏] 日志输出已禁用');
+        } else {
+            console.log('[zsxq全屏] 用法: toggleZsxqLog(1) 启用日志, toggleZsxqLog(0) 禁用日志');
+        }
+    };
+
+    // 自定义日志函数
+    function logMessage(message) {
+        if (logEnabled) {
+            console.log(message);
+        }
+    }
+
     // 打印使用说明
     console.log(`
 === zsxq视频网页全屏功能使用说明 ===
-版本: 1.1
+版本: 1.2
 
 【基本功能】
 • 点击"全屏"按钮可进入/退出网页全屏模式
@@ -41,6 +64,8 @@
   - 短按：快进/快退5秒
   - 长按（300ms以上）：3倍速播放
   - 松开：恢复正常速度
+• 方向键上下：
+  - 调整音量（每次±10%）
 
 【重要提示】
 • 按钮位置记忆功能默认处于关闭状态！
@@ -48,6 +73,10 @@
 • 该工具仅供学习使用
 • 全屏模式下视频容器会覆盖整个视窗
 • 拖拽按钮时点击不会触发全屏功能
+
+【日志控制】
+• 在控制台输入 toggleZsxqLog(1) 启用详细日志
+• 在控制台输入 toggleZsxqLog(0) 禁用详细日志
 
 如有问题，请检查控制台日志。
 ==================================`);
@@ -136,6 +165,11 @@
                         <li>短按：快进/快退5秒</li>
                         <li>长按（300ms以上）：3倍速播放</li>
                         <li>松开：恢复正常速度</li>
+                    </ul>
+                </li>
+                <li>方向键上下：
+                    <ul style="margin-top: 8px; margin-bottom: 8px;">
+                        <li>调整音量（每次±10%）</li>
                     </ul>
                 </li>
             </ul>
@@ -579,62 +613,132 @@
     class KeyboardController {
         constructor(toastManager) {
             this.toastManager = toastManager;
-            this.keyHoldTimer = null;
-            this.isLongPress = false;
             this.LONG_PRESS_THRESHOLD = 300;
+            this.isSetup = false;
+            this.keyTimers = new Map(); // 存储每个按键的定时器
+            this.activeSpeedKeys = new Set(); // 存储当前处于3倍速状态的按键
         }
 
-        setup(videoContainer, fullScreenController, fullScreenButton) {
-            window.addEventListener('keydown', (event) => {
+        setup(fullScreenController, fullScreenButton) {
+            if (this.isSetup) return;
+            this.isSetup = true;
+
+            const handleKeyDown = (event) => {
+                const videoContainer = document.querySelector('.video-container');
                 const videoElement = videoContainer?.querySelector('video');
                 if (!videoElement) return;
+
+                logMessage(`[zsxq全屏] 按键按下: ${event.key}`);
 
                 if (event.key === 'Escape') {
                     if (videoContainer._isPseudoFullScreen) {
                         fullScreenController.exitPseudoFullScreen(videoContainer);
                         this.toastManager.showToast('退出全屏');
                         fullScreenButton.innerText = '全屏';
+                        logMessage('[zsxq全屏] ESC键触发 - 退出全屏');
                     }
                 } else if (event.key === ' ') {
                     event.preventDefault();
                     if (videoElement.paused) {
                         videoElement.play();
                         this.toastManager.showToast('播放');
+                        logMessage('[zsxq全屏] 空格键触发 - 播放视频');
                     } else {
                         videoElement.pause();
                         this.toastManager.showToast('暂停');
+                        logMessage('[zsxq全屏] 空格键触发 - 暂停视频');
                     }
                 } else if (['ArrowRight', 'ArrowLeft'].includes(event.key)) {
                     event.preventDefault();
-                    if (this.keyHoldTimer) return;
 
-                    const direction = event.key === 'ArrowRight' ? 1 : -1;
-                    this.keyHoldTimer = setTimeout(() => {
-                        this.isLongPress = true;
-                        videoElement._originalPlaybackRate = videoElement.playbackRate;
-                        videoElement.playbackRate = 3.0;
-                        this.toastManager.showToast('3倍速播放中');
+                    // 如果已经存在该键的定时器，清除它（防止重复触发）
+                    if (this.keyTimers.has(event.key)) {
+                        clearTimeout(this.keyTimers.get(event.key));
+                    }
+
+                    // 设置长按检测定时器
+                    const timer = setTimeout(() => {
+                        // 长按触发：设置3倍速
+                        if (!this.activeSpeedKeys.has(event.key)) {
+                            videoElement._originalPlaybackRate = videoElement.playbackRate;
+                            videoElement.playbackRate = 3.0;
+                            this.activeSpeedKeys.add(event.key);
+                            this.toastManager.showToast('3倍速播放中');
+                            logMessage(`[zsxq全屏] ${event.key} 长按触发 - 3倍速播放`);
+                        }
                     }, this.LONG_PRESS_THRESHOLD);
 
-                    const handleKeyUp = (upEvent) => {
-                        if (upEvent.key === event.key) {
-                            clearTimeout(this.keyHoldTimer);
-                            this.keyHoldTimer = null;
-                            this.isLongPress = false;
+                    this.keyTimers.set(event.key, timer);
+                } else if (['ArrowUp', 'ArrowDown'].includes(event.key)) {
+                    event.preventDefault();
 
-                            if (videoElement.playbackRate === 3.0) {
-                                videoElement.playbackRate = videoElement._originalPlaybackRate || 1.0;
-                                this.toastManager.showToast('恢复正常速度');
-                            } else {
-                                videoElement.currentTime += direction * 5;
-                                this.toastManager.showToast(direction > 0 ? '快进 5 秒' : '快退 5 秒');
-                            }
+                    // 音量控制：上键增加音量，下键减少音量
+                    const currentVolume = videoElement.volume;
+                    const volumeStep = 0.1; // 每次调整0.1的音量
+                    let newVolume;
 
-                            window.removeEventListener('keyup', handleKeyUp);
-                        }
-                    };
+                    if (event.key === 'ArrowUp') {
+                        newVolume = Math.min(1.0, currentVolume + volumeStep);
+                        videoElement.volume = newVolume;
+                        this.toastManager.showToast(`音量: ${(newVolume * 100).toFixed(0)}%`);
+                        logMessage(`[zsxq全屏] ArrowUp 触发 - 音量增加到 ${(newVolume * 100).toFixed(0)}%`);
+                    } else {
+                        newVolume = Math.max(0.0, currentVolume - volumeStep);
+                        videoElement.volume = newVolume;
+                        this.toastManager.showToast(`音量: ${(newVolume * 100).toFixed(0)}%`);
+                        logMessage(`[zsxq全屏] ArrowDown 触发 - 音量减少到 ${(newVolume * 100).toFixed(0)}%`);
+                    }
+                } else {
+                    logMessage(`[zsxq全屏] 未处理的按键: ${event.key}`);
+                }
+            };
 
-                    window.addEventListener('keyup', handleKeyUp);
+            const handleKeyUp = (event) => {
+                if (['ArrowRight', 'ArrowLeft'].includes(event.key)) {
+                    const videoContainer = document.querySelector('.video-container');
+                    const videoElement = videoContainer?.querySelector('video');
+                    if (!videoElement) return;
+
+                    // 清除定时器
+                    if (this.keyTimers.has(event.key)) {
+                        clearTimeout(this.keyTimers.get(event.key));
+                        this.keyTimers.delete(event.key);
+                    }
+
+                    // 如果处于3倍速状态，恢复原速
+                    if (this.activeSpeedKeys.has(event.key)) {
+                        videoElement.playbackRate = videoElement._originalPlaybackRate || 1.0;
+                        delete videoElement._originalPlaybackRate;
+                        this.activeSpeedKeys.delete(event.key);
+                        this.toastManager.showToast('恢复正常速度');
+                        logMessage(`[zsxq全屏] ${event.key} 松开 - 恢复正常速度`);
+                    } else {
+                        // 是短按，执行快进/快退
+                        const direction = event.key === 'ArrowRight' ? 1 : -1;
+                        videoElement.currentTime += direction * 5;
+                        this.toastManager.showToast(direction > 0 ? '快进 5 秒' : '快退 5 秒');
+                        logMessage(`[zsxq全屏] ${event.key} 短按触发 - ${direction > 0 ? '快进' : '快退'} 5秒`);
+                    }
+                }
+            };
+
+            window.addEventListener('keydown', handleKeyDown);
+            window.addEventListener('keyup', handleKeyUp);
+
+            // 处理窗口失去焦点的情况
+            window.addEventListener('blur', () => {
+                // 清除所有定时器和重置播放速度
+                for (const [key, timer] of this.keyTimers) {
+                    clearTimeout(timer);
+                }
+                this.keyTimers.clear();
+
+                const videoContainer = document.querySelector('.video-container');
+                const videoElement = videoContainer?.querySelector('video');
+                if (videoElement && this.activeSpeedKeys.size > 0) {
+                    videoElement.playbackRate = videoElement._originalPlaybackRate || 1.0;
+                    delete videoElement._originalPlaybackRate;
+                    this.activeSpeedKeys.clear();
                 }
             });
         }
@@ -765,7 +869,7 @@
 
         // 键盘控制
         const keyboardController = new KeyboardController(toastManager);
-        const videoContainer = document.querySelector('.video-container');
-        keyboardController.setup(videoContainer, fullScreenController, fullScreenButton);
+        // 移除原来的videoContainer参数传递
+        keyboardController.setup(fullScreenController, fullScreenButton);
     });
 })();
