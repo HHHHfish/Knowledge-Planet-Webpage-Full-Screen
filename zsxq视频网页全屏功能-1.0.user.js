@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         zsxq视频网页全屏功能 1.3，如有问题请提issue
+// @name         zsxq视频网页全屏功能 1.4，如有问题请提issue
 // @namespace    http://tampermonkey.net/
-// @version      1.3
+// @version      1.4
 // @description  在知识星球网页版中为视频播放器添加全屏按钮，用于知识星球网页全屏，项目仅供学习使用，请勿非法使用，如有侵权请联系作者进行删除。
 // @author       hhhfish
 // @match        https://wx.zsxq.com/*
@@ -32,7 +32,7 @@
     // 打印使用说明
     console.log(`
 === zsxq视频网页全屏功能使用说明 ===
-版本: 1.3
+版本: 1.4
 
 【基本功能】
 • 点击"全屏"按钮可进入/退出网页全屏模式
@@ -49,6 +49,9 @@
 • 记忆位置：启用/禁用按钮位置记忆功能
   - 启用后：刷新页面会保持按钮位置
   - 禁用后：刷新页面按钮回到默认位置（右上角）
+• 记忆视频进度：启用/禁用视频播放进度记忆功能
+  - 启用后：自动保存并恢复视频播放进度
+  - 禁用后：不保存视频播放进度
 • 日志输出：启用/禁用详细日志输出
 
 【键盘快捷键】
@@ -61,7 +64,8 @@
 
 【重要提示】
 • 按钮位置记忆功能默认处于关闭状态！
-• 如需启用记忆功能，请右键点击按钮并选择"记忆位置"
+• 视频进度记忆功能默认处于关闭状态！
+• 如需启用记忆功能，请右键点击按钮并选择相应选项
 • 该工具仅供学习使用
 • 全屏模式下视频容器会覆盖整个视窗
 • 拖拽按钮时点击不会触发全屏功能
@@ -156,6 +160,12 @@
                         <li>禁用后：刷新页面按钮回到默认位置（右上角）</li>
                     </ul>
                 </li>
+                <li>记忆视频进度：启用/禁用视频播放进度记忆功能
+                    <ul style="margin-top: 8px; margin-bottom: 8px;">
+                        <li>启用后：自动保存并恢复视频播放进度</li>
+                        <li>禁用后：不保存视频播放进度</li>
+                    </ul>
+                </li>
                 <li>日志输出：启用/禁用详细日志输出</li>
             </ul>
             
@@ -178,7 +188,8 @@
             <p><strong>【重要提示】</strong></p>
             <ul>
                 <li>按钮位置记忆功能默认处于关闭状态！</li>
-                <li>如需启用记忆功能，请右键点击按钮并选择"记忆位置"</li>
+                <li>视频进度记忆功能默认处于关闭状态！</li>
+                <li>如需启用记忆功能，请右键点击按钮并选择相应选项</li>
                 <li>该工具仅供学习使用</li>
             </ul>
         `;
@@ -284,6 +295,54 @@
         constructor(toastManager) {
             this.toastManager = toastManager;
             this.originalBodyOverflow = document.body.style.overflow;
+            this.videoProgressKeyPrefix = 'zsxq_video_progress_';
+        }
+
+        // 获取当前页面URL作为视频ID
+        getVideoId() {
+            return window.location.href.split('?')[0]; // 移除查询参数
+        }
+
+        // 保存视频进度
+        saveVideoProgress(currentTime, duration) {
+            if (duration <= 0) return;
+
+            const videoId = this.getVideoId();
+            const progressKey = this.videoProgressKeyPrefix + videoId;
+
+            try {
+                localStorage.setItem(progressKey, JSON.stringify({
+                    currentTime: currentTime,
+                    duration: duration,
+                    savedAt: Date.now()
+                }));
+            } catch (e) {
+                console.warn('Failed to save video progress:', e);
+            }
+        }
+
+        // 恢复视频进度
+        restoreVideoProgress(videoElement) {
+            const videoId = this.getVideoId();
+            const progressKey = this.videoProgressKeyPrefix + videoId;
+
+            try {
+                const savedProgress = localStorage.getItem(progressKey);
+                if (savedProgress) {
+                    const progress = JSON.parse(savedProgress);
+                    // 只有当视频时长匹配且进度有效时才恢复
+                    if (progress.duration > 0 &&
+                        Math.abs(progress.duration - videoElement.duration) < 5 && // 允许5秒误差
+                        progress.currentTime > 0 &&
+                        progress.currentTime < progress.duration) {
+                        videoElement.currentTime = progress.currentTime;
+                        return true;
+                    }
+                }
+            } catch (e) {
+                console.warn('Failed to restore video progress:', e);
+            }
+            return false;
         }
 
         enterPseudoFullScreen(videoContainer) {
@@ -359,6 +418,7 @@
             this.dragEndYRatio = null;
             this.contextMenu = null;
             this.memoryEnabled = this.loadMemoryEnabledFromStorage();
+            this.videoProgressMemoryEnabled = this.loadVideoProgressMemoryEnabledFromStorage();
 
             this.loadPositionFromStorage();
             this.initDrag();
@@ -383,6 +443,26 @@
                 localStorage.setItem(MEMORY_ENABLED_KEY, String(enabled));
             } catch (e) {
                 console.warn('Failed to save memory enabled state:', e);
+            }
+        }
+
+        // 从localStorage加载视频进度记忆功能状态
+        loadVideoProgressMemoryEnabledFromStorage() {
+            try {
+                const saved = localStorage.getItem('zsxq_video_progress_memory_enabled');
+                return saved === 'true';
+            } catch (e) {
+                console.warn('Failed to load video progress memory enabled state:', e);
+                return false; // 默认禁用（修改此处：从 true 改为 false）
+            }
+        }
+
+        // 保存视频进度记忆功能状态到localStorage
+        saveVideoProgressMemoryEnabledToStorage(enabled) {
+            try {
+                localStorage.setItem('zsxq_video_progress_memory_enabled', String(enabled));
+            } catch (e) {
+                console.warn('Failed to save video progress memory enabled state:', e);
             }
         }
 
@@ -669,8 +749,79 @@
                 this.contextMenu = null;
             });
 
+            // 视频进度记忆选项
+            const videoProgressItem = document.createElement('div');
+            videoProgressItem.className = 'context-menu-item';
+            videoProgressItem.style.cssText = `
+                padding: 10px 16px;
+                cursor: pointer;
+                user-select: none;
+                display: flex;
+                align-items: center;
+                transition: all 0.2s ease;
+                border-top: 1px solid rgba(0, 0, 0, 0.05);
+            `;
+
+            const videoProgressCheckMark = document.createElement('div');
+            videoProgressCheckMark.style.cssText = `
+                width: 18px;
+                height: 18px;
+                border: 2px solid #d1d1d6;
+                border-radius: 4px;
+                margin-right: 12px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: all 0.2s ease;
+            `;
+
+            if (this.videoProgressMemoryEnabled) {
+                videoProgressCheckMark.style.backgroundColor = '#0a84ff';
+                videoProgressCheckMark.style.borderColor = '#0a84ff';
+                videoProgressCheckMark.innerHTML = '<svg width="12" height="12" viewBox="0 0 12 12" fill="white"><path d="M4.5 8.5L2 6l1-1 1.5 1.5L8 3l1 1-4.5 4.5z"/></svg>';
+            }
+
+            const videoProgressTextSpan = document.createElement('span');
+            videoProgressTextSpan.textContent = '记忆视频进度';
+
+            videoProgressItem.appendChild(videoProgressCheckMark);
+            videoProgressItem.appendChild(videoProgressTextSpan);
+
+            videoProgressItem.addEventListener('mouseenter', () => {
+                videoProgressItem.style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
+            });
+            videoProgressItem.addEventListener('mouseleave', () => {
+                videoProgressItem.style.backgroundColor = 'transparent';
+            });
+            videoProgressItem.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.videoProgressMemoryEnabled = !this.videoProgressMemoryEnabled;
+                this.saveVideoProgressMemoryEnabledToStorage(this.videoProgressMemoryEnabled);
+
+                if (this.videoProgressMemoryEnabled) {
+                    this.toastManager.showToast('已启用记忆视频进度');
+                } else {
+                    this.toastManager.showToast('已禁用记忆视频进度');
+                }
+
+                // 更新复选标记
+                if (this.videoProgressMemoryEnabled) {
+                    videoProgressCheckMark.style.backgroundColor = '#0a84ff';
+                    videoProgressCheckMark.style.borderColor = '#0a84ff';
+                    videoProgressCheckMark.innerHTML = '<svg width="12" height="12" viewBox="0 0 12 12" fill="white"><path d="M4.5 8.5L2 6l1-1 1.5 1.5L8 3l1 1-4.5 4.5z"/></svg>';
+                } else {
+                    videoProgressCheckMark.style.backgroundColor = 'transparent';
+                    videoProgressCheckMark.style.borderColor = '#d1d1d6';
+                    videoProgressCheckMark.innerHTML = '';
+                }
+
+                menu.remove();
+                this.contextMenu = null;
+            });
+
             menu.appendChild(memoryItem);
             menu.appendChild(logItem);
+            menu.appendChild(videoProgressItem);
             document.body.appendChild(menu);
             this.contextMenu = menu;
 
@@ -979,6 +1130,46 @@
             // 键盘控制
             const keyboardController = new KeyboardController(toastManager);
             keyboardController.setup(fullScreenController, fullScreenButton);
+
+            // 视频进度记忆功能
+            const videoElement = videoContainer.querySelector('video');
+            if (videoElement) {
+                // 当视频元数据加载完成后尝试恢复进度
+                videoElement.addEventListener('loadedmetadata', () => {
+                    // 只有在启用记忆功能时才恢复进度
+                    if (buttonManager.videoProgressMemoryEnabled && fullScreenController.restoreVideoProgress(videoElement)) {
+                        toastManager.showToast('已恢复播放进度');
+                    }
+                });
+
+                // 定期保存进度（每5秒）
+                let lastSavedTime = 0;
+                videoElement.addEventListener('timeupdate', () => {
+                    // 只有在启用记忆功能时才保存进度
+                    if (buttonManager.videoProgressMemoryEnabled) {
+                        const currentTime = videoElement.currentTime;
+                        const duration = videoElement.duration;
+
+                        // 避免过于频繁的保存（至少间隔5秒）
+                        if (currentTime > 0 &&
+                            duration > 0 &&
+                            (currentTime - lastSavedTime) >= 5) {
+                            fullScreenController.saveVideoProgress(currentTime, duration);
+                            lastSavedTime = currentTime;
+                        }
+                    }
+                });
+
+                // 页面卸载前保存最新进度
+                window.addEventListener('beforeunload', () => {
+                    // 只有在启用记忆功能时才保存进度
+                    if (buttonManager.videoProgressMemoryEnabled &&
+                        videoElement.currentTime > 0 &&
+                        videoElement.duration > 0) {
+                        fullScreenController.saveVideoProgress(videoElement.currentTime, videoElement.duration);
+                    }
+                });
+            }
 
             return true;
         }
