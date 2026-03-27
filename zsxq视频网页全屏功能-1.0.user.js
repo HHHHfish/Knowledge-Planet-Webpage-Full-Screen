@@ -1,9 +1,9 @@
 // ==UserScript==
-// @name         zsxq视频网页全屏功能
+// @name         zsxq视频网页全屏功能 1.3，如有问题请提issue
 // @namespace    http://tampermonkey.net/
 // @version      1.3
-// @description  在知识星球网页版中为视频播放器添加全屏按钮
-// @author       Your Name
+// @description  在知识星球网页版中为视频播放器添加全屏按钮，用于知识星球网页全屏，项目仅供学习使用，请勿非法使用，如有侵权请联系作者进行删除。
+// @author       hhhfish
 // @match        https://wx.zsxq.com/*
 // @grant        none
 // ==/UserScript==
@@ -32,7 +32,7 @@
     // 打印使用说明
     console.log(`
 === zsxq视频网页全屏功能使用说明 ===
-版本: 1.0
+版本: 1.3
 
 【基本功能】
 • 点击"全屏"按钮可进入/退出网页全屏模式
@@ -68,7 +68,9 @@
 • 在控制台输入 toggleZsxqLog(1) 启用详细日志
 • 在控制台输入 toggleZsxqLog(0) 禁用详细日志
 
-如有问题，请检查控制台日志。
+【致谢】
+• 脚本作者：Your Name
+• 不愿透漏姓名的小伙伴提供修改建议
 ==================================`);
 
     // ================== 首次使用提示对话框 ==================
