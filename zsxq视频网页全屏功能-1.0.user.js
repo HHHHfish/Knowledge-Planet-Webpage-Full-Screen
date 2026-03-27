@@ -40,6 +40,7 @@
 • 空格键可播放/暂停视频
 
 【按钮操作】
+• 初始位置：屏幕右上角
 • 左键拖拽：移动全屏按钮位置
 • 右键点击：打开上下文菜单
 • 双击：无特殊操作（避免误触）
@@ -48,6 +49,7 @@
 • 记忆位置：启用/禁用按钮位置记忆功能
   - 启用后：刷新页面会保持按钮位置
   - 禁用后：刷新页面按钮回到默认位置（右上角）
+• 日志输出：启用/禁用详细日志输出
 
 【键盘快捷键】
 • 方向键左右：
@@ -67,6 +69,7 @@
 【日志控制】
 • 在控制台输入 toggleZsxqLog(1) 启用详细日志
 • 在控制台输入 toggleZsxqLog(0) 禁用详细日志
+• 或通过右键菜单直接控制
 
 【致谢】
 • 脚本作者：hhhfish
@@ -77,6 +80,7 @@
     const FIRST_TIME_NOTICE_KEY = 'zsxq_first_time_notice_shown';
     const STORAGE_KEY = 'zsxq_fullscreen_button_position';
     const MEMORY_ENABLED_KEY = 'zsxq_fullscreen_memory_enabled';
+    const LOG_ENABLED_KEY = 'zsxqLogEnabled';
 
     function showFirstTimeNotice() {
         // 检查是否已经显示过
@@ -152,6 +156,7 @@
                         <li>禁用后：刷新页面按钮回到默认位置（右上角）</li>
                     </ul>
                 </li>
+                <li>日志输出：启用/禁用详细日志输出</li>
             </ul>
             
             <p><strong>【键盘快捷键】</strong></p>
@@ -505,42 +510,62 @@
                 position: fixed;
                 top: ${y}px;
                 left: ${x}px;
-                background: white;
-                border: 1px solid #ccc;
-                border-radius: 4px;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+                background: rgba(255, 255, 255, 0.8);
+                backdrop-filter: blur(20px);
+                -webkit-backdrop-filter: blur(20px);
+                border: 1px solid rgba(255, 255, 255, 0.3);
+                border-radius: 12px;
+                box-shadow: 0 8px 32px rgba(0,0,0,0.1), 0 4px 12px rgba(0,0,0,0.05);
                 z-index: 10000;
-                padding: 4px 0;
-                min-width: 120px;
+                padding: 8px 0;
+                min-width: 160px;
                 font-size: 14px;
+                overflow: hidden;
             `;
 
             // 记忆位置选项
             const memoryItem = document.createElement('div');
             memoryItem.className = 'context-menu-item';
             memoryItem.style.cssText = `
-                padding: 6px 12px;
+                padding: 10px 16px;
                 cursor: pointer;
                 user-select: none;
                 display: flex;
                 align-items: center;
+                transition: all 0.2s ease;
             `;
 
-            // 添加复选标记
-            const checkMark = document.createElement('span');
-            checkMark.style.marginRight = '8px';
-            checkMark.textContent = this.memoryEnabled ? '✓' : ' ';
-            memoryItem.appendChild(checkMark);
+            // 添加复选标记 - 使用更明显的视觉效果
+            const memoryCheckMark = document.createElement('div');
+            memoryCheckMark.style.cssText = `
+                width: 18px;
+                height: 18px;
+                border: 2px solid #d1d1d6;
+                border-radius: 4px;
+                margin-right: 12px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: all 0.2s ease;
+            `;
 
-            const textSpan = document.createElement('span');
-            textSpan.textContent = '记忆位置';
-            memoryItem.appendChild(textSpan);
+            if (this.memoryEnabled) {
+                memoryCheckMark.style.backgroundColor = '#0a84ff';
+                memoryCheckMark.style.borderColor = '#0a84ff';
+                memoryCheckMark.innerHTML = '<svg width="12" height="12" viewBox="0 0 12 12" fill="white"><path d="M4.5 8.5L2 6l1-1 1.5 1.5L8 3l1 1-4.5 4.5z"/></svg>';
+            }
+
+            const memoryTextSpan = document.createElement('span');
+            memoryTextSpan.textContent = '记忆位置';
+
+            memoryItem.appendChild(memoryCheckMark);
+            memoryItem.appendChild(memoryTextSpan);
 
             memoryItem.addEventListener('mouseenter', () => {
-                memoryItem.style.backgroundColor = '#f5f5f5';
+                memoryItem.style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
             });
             memoryItem.addEventListener('mouseleave', () => {
-                memoryItem.style.backgroundColor = 'white';
+                memoryItem.style.backgroundColor = 'transparent';
             });
             memoryItem.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -558,13 +583,94 @@
                     this.resetToDefaultPosition();
                     this.toastManager.showToast('已禁用记忆位置');
                 }
-                checkMark.textContent = this.memoryEnabled ? '✓' : ' ';
+
+                // 更新复选标记
+                if (this.memoryEnabled) {
+                    memoryCheckMark.style.backgroundColor = '#0a84ff';
+                    memoryCheckMark.style.borderColor = '#0a84ff';
+                    memoryCheckMark.innerHTML = '<svg width="12" height="12" viewBox="0 0 12 12" fill="white"><path d="M4.5 8.5L2 6l1-1 1.5 1.5L8 3l1 1-4.5 4.5z"/></svg>';
+                } else {
+                    memoryCheckMark.style.backgroundColor = 'transparent';
+                    memoryCheckMark.style.borderColor = '#d1d1d6';
+                    memoryCheckMark.innerHTML = '';
+                }
+
+                menu.remove();
+                this.contextMenu = null;
+            });
+
+            // 日志输出选项
+            const logItem = document.createElement('div');
+            logItem.className = 'context-menu-item';
+            logItem.style.cssText = `
+                padding: 10px 16px;
+                cursor: pointer;
+                user-select: none;
+                display: flex;
+                align-items: center;
+                transition: all 0.2s ease;
+                border-top: 1px solid rgba(0, 0, 0, 0.05);
+            `;
+
+            const logCheckMark = document.createElement('div');
+            logCheckMark.style.cssText = `
+                width: 18px;
+                height: 18px;
+                border: 2px solid #d1d1d6;
+                border-radius: 4px;
+                margin-right: 12px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: all 0.2s ease;
+            `;
+
+            if (isZsxqLogEnabled) {
+                logCheckMark.style.backgroundColor = '#0a84ff';
+                logCheckMark.style.borderColor = '#0a84ff';
+                logCheckMark.innerHTML = '<svg width="12" height="12" viewBox="0 0 12 12" fill="white"><path d="M4.5 8.5L2 6l1-1 1.5 1.5L8 3l1 1-4.5 4.5z"/></svg>';
+            }
+
+            const logTextSpan = document.createElement('span');
+            logTextSpan.textContent = '日志输出';
+
+            logItem.appendChild(logCheckMark);
+            logItem.appendChild(logTextSpan);
+
+            logItem.addEventListener('mouseenter', () => {
+                logItem.style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
+            });
+            logItem.addEventListener('mouseleave', () => {
+                logItem.style.backgroundColor = 'transparent';
+            });
+            logItem.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const newLogState = !isZsxqLogEnabled;
+                toggleZsxqLog(newLogState);
+
+                if (newLogState) {
+                    this.toastManager.showToast('已启用日志输出');
+                } else {
+                    this.toastManager.showToast('已禁用日志输出');
+                }
+
+                // 更新复选标记
+                if (newLogState) {
+                    logCheckMark.style.backgroundColor = '#0a84ff';
+                    logCheckMark.style.borderColor = '#0a84ff';
+                    logCheckMark.innerHTML = '<svg width="12" height="12" viewBox="0 0 12 12" fill="white"><path d="M4.5 8.5L2 6l1-1 1.5 1.5L8 3l1 1-4.5 4.5z"/></svg>';
+                } else {
+                    logCheckMark.style.backgroundColor = 'transparent';
+                    logCheckMark.style.borderColor = '#d1d1d6';
+                    logCheckMark.innerHTML = '';
+                }
 
                 menu.remove();
                 this.contextMenu = null;
             });
 
             menu.appendChild(memoryItem);
+            menu.appendChild(logItem);
             document.body.appendChild(menu);
             this.contextMenu = menu;
 
@@ -743,15 +849,19 @@
             top: 10%;
             left: 50%;
             transform: translate(-50%, 0);
-            background-color: rgba(0, 0, 0, 0.7);
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
             color: white;
             padding: 10px 20px;
-            border-radius: 4px;
+            border-radius: 12px;
             z-index: 10000;
             pointer-events: none;
             transition: opacity 0.3s;
             opacity: 0;
             font-size: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         }
         .video-toast.show {
             opacity: 1;
@@ -761,9 +871,11 @@
             top: 10px;
             right: 10px;
             z-index: 9999;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            color: #6495ed;
+            border: 1px solid rgba(255, 255, 255, 0.3);
             padding: 8px 16px;
             cursor: move;
             border-radius: 20px;
@@ -774,16 +886,17 @@
             gap: 5px;
             user-select: none;
             white-space: nowrap;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            font-weight: 500;
         }
         .fullscreen-btn:hover {
-            background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+            background: rgba(255, 255, 255, 0.3);
             transform: translateY(-2px);
-            box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+            box-shadow: 0 6px 24px rgba(0,0,0,0.15);
         }
         .fullscreen-btn:active {
             transform: translateY(0);
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 12px rgba(0,0,0,0.1);
         }
         .fullscreen-btn::before {
             content: '⤢';
@@ -791,24 +904,27 @@
         }
         .fullscreen-context-menu {
             position: fixed;
-            background: white;
-            border: 1px solid #e0e0e0;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1), 0 4px 12px rgba(0,0,0,0.05);
             z-index: 10000;
-            padding: 4px 0;
-            min-width: 120px;
+            padding: 8px 0;
+            min-width: 160px;
             font-size: 14px;
             animation: fadeIn 0.2s ease;
+            overflow: hidden;
         }
         .context-menu-item {
-            padding: 8px 16px;
+            padding: 10px 16px;
             cursor: pointer;
             user-select: none;
             transition: background 0.2s;
         }
         .context-menu-item:hover {
-            background: #f0f0f0;
+            background: rgba(0, 0, 0, 0.05);
         }
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(-5px); }
