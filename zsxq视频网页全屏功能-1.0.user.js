@@ -11,12 +11,19 @@
 (function () {
     'use strict';
 
+    // ================== 常量定义 ==================
+    const FIRST_TIME_NOTICE_KEY = 'zsxq_first_time_notice_shown';
+    const STORAGE_KEY = 'zsxq_fullscreen_button_position';
+    const MEMORY_ENABLED_KEY = 'zsxq_fullscreen_memory_enabled';
+    const VIDEO_PROGRESS_MEMORY_ENABLED_KEY = 'zsxq_video_progress_memory_enabled';
+    const LOG_ENABLED_KEY = 'zsxqLogEnabled';
+
     // 日志控制 - 从localStorage读取初始状态（默认关闭）
-    let isZsxqLogEnabled = localStorage.getItem('zsxqLogEnabled') === 'true';
+    let isZsxqLogEnabled = localStorage.getItem(LOG_ENABLED_KEY) === 'true';
 
     function toggleZsxqLog(enable) {
         isZsxqLogEnabled = Boolean(enable);
-        localStorage.setItem('zsxqLogEnabled', isZsxqLogEnabled.toString());
+        localStorage.setItem(LOG_ENABLED_KEY, isZsxqLogEnabled.toString());
         console.log(`[zsxq] 日志输出已${isZsxqLogEnabled ? '开启' : '关闭'}`);
     }
 
@@ -81,20 +88,27 @@
 ==================================`);
 
     // ================== 首次使用提示对话框 ==================
-    const FIRST_TIME_NOTICE_KEY = 'zsxq_first_time_notice_shown';
-    const STORAGE_KEY = 'zsxq_fullscreen_button_position';
-    const MEMORY_ENABLED_KEY = 'zsxq_fullscreen_memory_enabled';
-    const LOG_ENABLED_KEY = 'zsxqLogEnabled';
+    function saveFirstTimeNoticeStatus() {
+        try {
+            localStorage.setItem(FIRST_TIME_NOTICE_KEY, 'true');
+        } catch (e) {
+            console.warn('Failed to save first time notice status:', e);
+        }
+    }
+
+    function hasShownFirstTimeNotice() {
+        try {
+            return localStorage.getItem(FIRST_TIME_NOTICE_KEY) === 'true';
+        } catch (e) {
+            console.warn('Failed to check first time notice status:', e);
+            return false;
+        }
+    }
 
     function showFirstTimeNotice() {
         // 检查是否已经显示过
-        try {
-            const hasShown = localStorage.getItem(FIRST_TIME_NOTICE_KEY);
-            if (hasShown === 'true') {
-                return;
-            }
-        } catch (e) {
-            console.warn('Failed to check first time notice status:', e);
+        if (hasShownFirstTimeNotice()) {
+            return;
         }
 
         // 创建遮罩层
@@ -215,12 +229,7 @@
         `;
 
         closeButton.addEventListener('click', () => {
-            // 记录已显示状态
-            try {
-                localStorage.setItem(FIRST_TIME_NOTICE_KEY, 'true');
-            } catch (e) {
-                console.warn('Failed to save first time notice status:', e);
-            }
+            saveFirstTimeNoticeStatus();
             overlay.remove();
         });
 
@@ -234,11 +243,7 @@
         // 点击遮罩层外部也可以关闭
         overlay.addEventListener('click', (e) => {
             if (e.target === overlay) {
-                try {
-                    localStorage.setItem(FIRST_TIME_NOTICE_KEY, 'true');
-                } catch (e) {
-                    console.warn('Failed to save first time notice status:', e);
-                }
+                saveFirstTimeNoticeStatus();
                 overlay.remove();
             }
         });
@@ -449,18 +454,18 @@
         // 从localStorage加载视频进度记忆功能状态
         loadVideoProgressMemoryEnabledFromStorage() {
             try {
-                const saved = localStorage.getItem('zsxq_video_progress_memory_enabled');
+                const saved = localStorage.getItem(VIDEO_PROGRESS_MEMORY_ENABLED_KEY);
                 return saved === 'true';
             } catch (e) {
                 console.warn('Failed to load video progress memory enabled state:', e);
-                return false; // 默认禁用（修改此处：从 true 改为 false）
+                return false; // 默认禁用
             }
         }
 
         // 保存视频进度记忆功能状态到localStorage
         saveVideoProgressMemoryEnabledToStorage(enabled) {
             try {
-                localStorage.setItem('zsxq_video_progress_memory_enabled', String(enabled));
+                localStorage.setItem(VIDEO_PROGRESS_MEMORY_ENABLED_KEY, String(enabled));
             } catch (e) {
                 console.warn('Failed to save video progress memory enabled state:', e);
             }
