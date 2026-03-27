@@ -1,48 +1,38 @@
 // ==UserScript==
 // @name         zsxq视频网页全屏功能
 // @namespace    http://tampermonkey.net/
-// @version      1.2
-// @description  为zsxq视频网站添加一个网页全屏的功能
-// @author       You
-// @match        *://wx.zsxq.com/*
+// @version      1.3
+// @description  在知识星球网页版中为视频播放器添加全屏按钮
+// @author       Your Name
+// @match        https://wx.zsxq.com/*
 // @grant        none
 // ==/UserScript==
 
-(() => {
+(function () {
     'use strict';
 
-    // ================== 常量定义 ==================
-    const STORAGE_KEY = 'zsxq_fullscreen_button_position';
-    const MEMORY_ENABLED_KEY = 'zsxq_fullscreen_memory_enabled';
-    const FIRST_TIME_NOTICE_KEY = 'zsxq_fullscreen_first_time_notice_shown';
+    // 日志控制 - 从localStorage读取初始状态（默认关闭）
+    let isZsxqLogEnabled = localStorage.getItem('zsxqLogEnabled') === 'true';
 
-    // 日志控制开关
-    let logEnabled = false;
+    function toggleZsxqLog(enable) {
+        isZsxqLogEnabled = Boolean(enable);
+        localStorage.setItem('zsxqLogEnabled', isZsxqLogEnabled.toString());
+        console.log(`[zsxq] 日志输出已${isZsxqLogEnabled ? '开启' : '关闭'}`);
+    }
 
-    // 暴露日志控制函数到全局作用域
-    window.toggleZsxqLog = function (enable) {
-        if (enable === 1) {
-            logEnabled = true;
-            console.log('[zsxq全屏] 日志输出已启用');
-        } else if (enable === 0) {
-            logEnabled = false;
-            console.log('[zsxq全屏] 日志输出已禁用');
-        } else {
-            console.log('[zsxq全屏] 用法: toggleZsxqLog(1) 启用日志, toggleZsxqLog(0) 禁用日志');
-        }
-    };
+    // 暴露toggleZsxqLog到全局作用域
+    window.toggleZsxqLog = toggleZsxqLog;
 
-    // 自定义日志函数
-    function logMessage(message) {
-        if (logEnabled) {
-            console.log(message);
+    function zsxqLog(...args) {
+        if (isZsxqLogEnabled) {
+            console.log('[zsxq]', ...args);
         }
     }
 
     // 打印使用说明
     console.log(`
 === zsxq视频网页全屏功能使用说明 ===
-版本: 1.2
+版本: 1.0
 
 【基本功能】
 • 点击"全屏"按钮可进入/退出网页全屏模式
@@ -82,6 +72,10 @@
 ==================================`);
 
     // ================== 首次使用提示对话框 ==================
+    const FIRST_TIME_NOTICE_KEY = 'zsxq_first_time_notice_shown';
+    const STORAGE_KEY = 'zsxq_fullscreen_button_position';
+    const MEMORY_ENABLED_KEY = 'zsxq_fullscreen_memory_enabled';
+
     function showFirstTimeNotice() {
         // 检查是否已经显示过
         try {
@@ -455,7 +449,6 @@
                     const rect = this.button.getBoundingClientRect();
                     this.dragEndXRatio = rect.left / window.innerWidth;
                     this.dragEndYRatio = rect.top / window.innerHeight;
-                    // 保存位置到localStorage（仅当功能启用时）
                     this.savePositionToStorage(this.dragEndXRatio, this.dragEndYRatio);
                 }
             });
@@ -549,12 +542,10 @@
             });
             memoryItem.addEventListener('click', (e) => {
                 e.stopPropagation();
-                // 切换记忆位置功能状态
                 this.memoryEnabled = !this.memoryEnabled;
                 this.saveMemoryEnabledToStorage(this.memoryEnabled);
 
                 if (this.memoryEnabled) {
-                    // 启用时，保存当前位置
                     const rect = this.button.getBoundingClientRect();
                     this.dragEndXRatio = rect.left / window.innerWidth;
                     this.dragEndYRatio = rect.top / window.innerHeight;
@@ -565,8 +556,6 @@
                     this.resetToDefaultPosition();
                     this.toastManager.showToast('已禁用记忆位置');
                 }
-
-                // 更新菜单中的复选标记
                 checkMark.textContent = this.memoryEnabled ? '✓' : ' ';
 
                 menu.remove();
@@ -601,7 +590,6 @@
             this.button.style.bottom = 'auto';
             this.dragEndXRatio = null;
             this.dragEndYRatio = null;
-            // 不再自动清除localStorage中的位置数据，因为功能可能被重新启用
         }
 
         wasJustDragged() {
@@ -628,25 +616,25 @@
                 const videoElement = videoContainer?.querySelector('video');
                 if (!videoElement) return;
 
-                logMessage(`[zsxq全屏] 按键按下: ${event.key}`);
+                zsxqLog(`[zsxq] 按键按下: ${event.key}`);
 
                 if (event.key === 'Escape') {
                     if (videoContainer._isPseudoFullScreen) {
                         fullScreenController.exitPseudoFullScreen(videoContainer);
                         this.toastManager.showToast('退出全屏');
                         fullScreenButton.innerText = '全屏';
-                        logMessage('[zsxq全屏] ESC键触发 - 退出全屏');
+                        zsxqLog('[zsxq] ESC键触发 - 退出全屏');
                     }
                 } else if (event.key === ' ') {
                     event.preventDefault();
                     if (videoElement.paused) {
                         videoElement.play();
                         this.toastManager.showToast('播放');
-                        logMessage('[zsxq全屏] 空格键触发 - 播放视频');
+                        zsxqLog('[zsxq] 空格键触发 - 播放视频');
                     } else {
                         videoElement.pause();
                         this.toastManager.showToast('暂停');
-                        logMessage('[zsxq全屏] 空格键触发 - 暂停视频');
+                        zsxqLog('[zsxq] 空格键触发 - 暂停视频');
                     }
                 } else if (['ArrowRight', 'ArrowLeft'].includes(event.key)) {
                     event.preventDefault();
@@ -664,7 +652,7 @@
                             videoElement.playbackRate = 3.0;
                             this.activeSpeedKeys.add(event.key);
                             this.toastManager.showToast('3倍速播放中');
-                            logMessage(`[zsxq全屏] ${event.key} 长按触发 - 3倍速播放`);
+                            zsxqLog(`[zsxq] ${event.key} 长按触发 - 3倍速播放`);
                         }
                     }, this.LONG_PRESS_THRESHOLD);
 
@@ -681,15 +669,15 @@
                         newVolume = Math.min(1.0, currentVolume + volumeStep);
                         videoElement.volume = newVolume;
                         this.toastManager.showToast(`音量: ${(newVolume * 100).toFixed(0)}%`);
-                        logMessage(`[zsxq全屏] ArrowUp 触发 - 音量增加到 ${(newVolume * 100).toFixed(0)}%`);
+                        zsxqLog(`[zsxq] ArrowUp 触发 - 音量增加到 ${(newVolume * 100).toFixed(0)}%`);
                     } else {
                         newVolume = Math.max(0.0, currentVolume - volumeStep);
                         videoElement.volume = newVolume;
                         this.toastManager.showToast(`音量: ${(newVolume * 100).toFixed(0)}%`);
-                        logMessage(`[zsxq全屏] ArrowDown 触发 - 音量减少到 ${(newVolume * 100).toFixed(0)}%`);
+                        zsxqLog(`[zsxq] ArrowDown 触发 - 音量减少到 ${(newVolume * 100).toFixed(0)}%`);
                     }
                 } else {
-                    logMessage(`[zsxq全屏] 未处理的按键: ${event.key}`);
+                    zsxqLog(`[zsxq] 未处理的按键: ${event.key}`);
                 }
             };
 
@@ -711,13 +699,13 @@
                         delete videoElement._originalPlaybackRate;
                         this.activeSpeedKeys.delete(event.key);
                         this.toastManager.showToast('恢复正常速度');
-                        logMessage(`[zsxq全屏] ${event.key} 松开 - 恢复正常速度`);
+                        zsxqLog(`[zsxq] ${event.key} 松开 - 恢复正常速度`);
                     } else {
                         // 是短按，执行快进/快退
                         const direction = event.key === 'ArrowRight' ? 1 : -1;
                         videoElement.currentTime += direction * 5;
                         this.toastManager.showToast(direction > 0 ? '快进 5 秒' : '快退 5 秒');
-                        logMessage(`[zsxq全屏] ${event.key} 短按触发 - ${direction > 0 ? '快进' : '快退'} 5秒`);
+                        zsxqLog(`[zsxq] ${event.key} 短按触发 - ${direction > 0 ? '快进' : '快退'} 5秒`);
                     }
                 }
             };
@@ -745,131 +733,151 @@
     }
 
     // ================== 主逻辑 ==================
-    window.addEventListener('load', () => {
-        // 注入样式
-        const style = document.createElement('style');
-        style.textContent = `
-            .video-toast {
-                position: fixed;
-                top: 10%;
-                left: 50%;
-                transform: translate(-50%, 0);
-                background-color: rgba(0, 0, 0, 0.7);
-                color: white;
-                padding: 10px 20px;
-                border-radius: 4px;
-                z-index: 10000;
-                pointer-events: none;
-                transition: opacity 0.3s;
-                opacity: 0;
-                font-size: 14px;
-            }
-            .video-toast.show {
-                opacity: 1;
-            }
-            .fullscreen-btn {
-                position: fixed;
-                top: 10px;
-                right: 10px;
-                z-index: 9999;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                color: white;
-                border: none;
-                padding: 8px 16px;
-                cursor: move;
-                border-radius: 20px;
-                font-size: 14px;
-                transition: all 0.3s ease;
-                display: flex;
-                align-items: center;
-                gap: 5px;
-                user-select: none;
-                white-space: nowrap;
-                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            }
-            .fullscreen-btn:hover {
-                background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
-                transform: translateY(-2px);
-                box-shadow: 0 6px 12px rgba(0,0,0,0.15);
-            }
-            .fullscreen-btn:active {
-                transform: translateY(0);
-                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            }
-            .fullscreen-btn::before {
-                content: '⤢';
-                font-size: 16px;
-            }
-            .fullscreen-context-menu {
-                position: fixed;
-                background: white;
-                border: 1px solid #e0e0e0;
-                border-radius: 8px;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-                z-index: 10000;
-                padding: 4px 0;
-                min-width: 120px;
-                font-size: 14px;
-                animation: fadeIn 0.2s ease;
-            }
-            .context-menu-item {
-                padding: 8px 16px;
-                cursor: pointer;
-                user-select: none;
-                transition: background 0.2s;
-            }
-            .context-menu-item:hover {
-                background: #f0f0f0;
-            }
-            @keyframes fadeIn {
-                from { opacity: 0; transform: translateY(-5px); }
-                to { opacity: 1; transform: translateY(0); }
-            }
-        `;
-        document.head.appendChild(style);
+    // 注入样式
+    const style = document.createElement('style');
+    style.textContent = `
+        .video-toast {
+            position: fixed;
+            top: 10%;
+            left: 50%;
+            transform: translate(-50%, 0);
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 4px;
+            z-index: 10000;
+            pointer-events: none;
+            transition: opacity 0.3s;
+            opacity: 0;
+            font-size: 14px;
+        }
+        .video-toast.show {
+            opacity: 1;
+        }
+        .fullscreen-btn {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 9999;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            cursor: move;
+            border-radius: 20px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            user-select: none;
+            white-space: nowrap;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .fullscreen-btn:hover {
+            background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+        }
+        .fullscreen-btn:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .fullscreen-btn::before {
+            content: '⤢';
+            font-size: 16px;
+        }
+        .fullscreen-context-menu {
+            position: fixed;
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 10000;
+            padding: 4px 0;
+            min-width: 120px;
+            font-size: 14px;
+            animation: fadeIn 0.2s ease;
+        }
+        .context-menu-item {
+            padding: 8px 16px;
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.2s;
+        }
+        .context-menu-item:hover {
+            background: #f0f0f0;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    `;
+    document.head.appendChild(style);
 
-        // 初始化组件
-        const toastManager = new ToastManager();
-        const fullScreenController = new FullScreenController(toastManager);
+    // 使用 MutationObserver 等待视频容器出现
+    function initWhenVideoContainerExists() {
+        const videoContainer = document.querySelector('.video-container');
+        if (videoContainer) {
+            // 初始化组件
+            const toastManager = new ToastManager();
+            const fullScreenController = new FullScreenController(toastManager);
 
-        const fullScreenButton = document.createElement('button');
-        fullScreenButton.className = 'fullscreen-btn';
-        fullScreenButton.innerText = '全屏';
-        document.body.appendChild(fullScreenButton);
+            const fullScreenButton = document.createElement('button');
+            fullScreenButton.className = 'fullscreen-btn';
+            fullScreenButton.innerText = '全屏';
+            document.body.appendChild(fullScreenButton);
 
-        const buttonManager = new ButtonManager(fullScreenButton, toastManager);
+            const buttonManager = new ButtonManager(fullScreenButton, toastManager);
 
-        // 全屏点击逻辑
-        fullScreenButton.addEventListener('click', (e) => {
-            if (buttonManager.wasJustDragged()) {
-                e.preventDefault();
-                e.stopPropagation();
-                return;
-            }
+            // 全屏点击逻辑
+            fullScreenButton.addEventListener('click', (e) => {
+                if (buttonManager.wasJustDragged()) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return;
+                }
 
-            const videoContainer = document.querySelector('.video-container');
-            if (!videoContainer) {
-                toastManager.showToast('错误：未找到视频');
-                return;
-            }
+                const videoContainer = document.querySelector('.video-container');
+                if (!videoContainer) {
+                    toastManager.showToast('错误：未找到视频');
+                    return;
+                }
 
-            if (videoContainer._isPseudoFullScreen) {
-                fullScreenController.exitPseudoFullScreen(videoContainer);
-                toastManager.showToast('退出全屏');
-                fullScreenButton.innerText = '全屏';
-            } else {
-                fullScreenController.enterPseudoFullScreen(videoContainer);
-                toastManager.showToast('进入全屏 (按ESC退出)');
-                fullScreenButton.innerText = '退出全屏';
+                if (videoContainer._isPseudoFullScreen) {
+                    fullScreenController.exitPseudoFullScreen(videoContainer);
+                    toastManager.showToast('退出全屏');
+                    fullScreenButton.innerText = '全屏';
+                } else {
+                    fullScreenController.enterPseudoFullScreen(videoContainer);
+                    toastManager.showToast('进入全屏 (按ESC退出)');
+                    fullScreenButton.innerText = '退出全屏';
+                }
+            });
+
+            // 显示首次使用提示
+            showFirstTimeNotice();
+
+            // 键盘控制
+            const keyboardController = new KeyboardController(toastManager);
+            keyboardController.setup(fullScreenController, fullScreenButton);
+
+            return true;
+        }
+        return false;
+    }
+
+    if (!initWhenVideoContainerExists()) {
+        // 如果立即初始化失败，使用 MutationObserver 监听 DOM 变化
+        const observer = new MutationObserver(() => {
+            if (initWhenVideoContainerExists()) {
+                observer.disconnect();
             }
         });
 
-        // 显示首次使用提示
-        showFirstTimeNotice();
-
-        // 键盘控制
-        const keyboardController = new KeyboardController(toastManager);
-        // 移除原来的videoContainer参数传递
-        keyboardController.setup(fullScreenController, fullScreenButton);
-    });
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+    }
 })();
