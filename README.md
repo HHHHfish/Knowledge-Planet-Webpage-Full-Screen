@@ -1,6 +1,7 @@
 # Knowledge-Planet-Webpage-Full-Screen
 
 用于知识星球网页全屏，项目仅供学习使用，请勿非法使用，如有侵权请联系作者进行删除。
+好用的话求个star
 
 ## 功能说明
 
