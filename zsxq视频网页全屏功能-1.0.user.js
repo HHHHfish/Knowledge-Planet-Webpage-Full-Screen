@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         zsxq视频网页全屏功能 1.9.5，如有问题请提issue
+// @name         zsxq视频网页全屏功能 1.9.6，如有问题请提issue
 // @namespace    http://tampermonkey.net/
-// @version      1.9.5
+// @version      1.9.6
 // @description  在知识星球网页版中为视频播放器添加全屏按钮（悬浮按钮 + 播放控件条按钮），用于知识星球网页全屏，项目仅供学习使用，请勿非法使用，如有侵权请联系作者进行删除。
 // @author       hhhfish
 // @match        https://wx.zsxq.com/*
@@ -39,7 +39,7 @@
     // 打印使用说明
     console.log(`
 === zsxq视频网页全屏功能使用说明 ===
-版本: 1.9.5
+版本: 1.9.6
 
 【基本功能】
 • 点击"全屏"按钮可进入/退出网页全屏模式
@@ -1557,28 +1557,32 @@
         }
     }
 
-    // 站点控件语义（id 与动作相反）：
-    //   #pause = 播放按钮；#play = 暂停按钮；#play-btn = 中央播放钮
-    // 控件显隐交给站点，脚本不强制改 display/class。
+    // 空格切换播放/暂停。
+    // 显示约定：暂停时控件是「播放」钮，播放时控件是「暂停」钮。
+    // 注意：点击目标不要写反 —— 要播放就点播放侧，要暂停就点暂停侧。
     function togglePlayback(video) {
         if (!video) return;
         const wantPlay = Boolean(video.paused);
         const container = getVideoContainer();
         if (!container) return;
 
-        const playCtrl = container.querySelector('#play');   // 暂停钮
-        const pauseCtrl = container.querySelector('#pause'); // 播放钮
+        // 清掉页面中间可能残留的暂停/播放 icon
+        container.querySelectorAll('.zsxq-flash-icon, .zsxq-center-play').forEach((el) => el.remove());
+
+        const playCtrl = container.querySelector('#play');
+        const pauseCtrl = container.querySelector('#pause');
         const centerBtn = container.querySelector('#play-btn');
 
+        // 要播放 → 点播放控件；要暂停 → 点暂停控件
         const target = wantPlay
-            ? (pauseCtrl || centerBtn)
-            : playCtrl;
+            ? (playCtrl || centerBtn)
+            : pauseCtrl;
 
         if (target) {
             try { target.click(); } catch (_) { /* ignore */ }
         }
 
-        // 站点未接管时，同步兜底（需在用户手势调用栈内）
+        // 站点未接管时同步兜底（须在用户手势调用栈内）
         if (wantPlay && video.paused) {
             const p = video.play();
             if (p && typeof p.catch === 'function') {
@@ -1587,7 +1591,7 @@
         } else if (!wantPlay && !video.paused) {
             video.pause();
         }
-        zsxqLog('[zsxq] 切换播放状态', wantPlay ? '-> play' : '-> pause');
+        zsxqLog('[zsxq] 切换播放状态', wantPlay ? '-> play' : '-> pause', 'target=', target && target.id);
     }
 
     function bindPlayerChromeSync(video) {
