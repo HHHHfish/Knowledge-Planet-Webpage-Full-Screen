@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         zsxq视频网页全屏功能 1.9.6，如有问题请提issue
+// @name         zsxq视频网页全屏功能 1.9.7，如有问题请提issue
 // @namespace    http://tampermonkey.net/
-// @version      1.9.6
+// @version      1.9.7
 // @description  在知识星球网页版中为视频播放器添加全屏按钮（悬浮按钮 + 播放控件条按钮），用于知识星球网页全屏，项目仅供学习使用，请勿非法使用，如有侵权请联系作者进行删除。
 // @author       hhhfish
 // @match        https://wx.zsxq.com/*
@@ -39,7 +39,7 @@
     // 打印使用说明
     console.log(`
 === zsxq视频网页全屏功能使用说明 ===
-版本: 1.9.6
+版本: 1.9.7
 
 【基本功能】
 • 点击"全屏"按钮可进入/退出网页全屏模式
@@ -1444,11 +1444,11 @@
         const existing = videoControls.querySelector('.zsxq-next-btn');
         if (existing && existing !== nextButton) existing.remove();
 
-        // 放在播放控件旁：#pause（播放钮）或 #play（暂停钮）紧后面
-        const pauseCtrl = videoControls.querySelector('#pause') || videoControls.querySelector('#play');
-        if (pauseCtrl) {
-            if (pauseCtrl.nextSibling !== nextButton) {
-                videoControls.insertBefore(nextButton, pauseCtrl.nextSibling);
+        // 放在播放/暂停切换钮旁（实测控件条首个切换钮是 #pause，兼容 #play）
+        const barToggle = videoControls.querySelector('#pause') || videoControls.querySelector('#play');
+        if (barToggle) {
+            if (barToggle.nextSibling !== nextButton) {
+                videoControls.insertBefore(nextButton, barToggle.nextSibling);
             }
         } else if (videoControls.firstElementChild !== nextButton) {
             videoControls.insertBefore(nextButton, videoControls.firstChild);
@@ -1558,8 +1558,10 @@
     }
 
     // 空格切换播放/暂停。
-    // 显示约定：暂停时控件是「播放」钮，播放时控件是「暂停」钮。
-    // 注意：点击目标不要写反 —— 要播放就点播放侧，要暂停就点暂停侧。
+    // 真实 DOM（2024 实测）：
+    //   - 控制条切换钮 id 固定为 #pause（无 #play 节点），图标由 CSS 画播放/暂停
+    //   - 中央 #play-btn 仅在暂停时存在
+    // 点击顺序：要播放优先中央 #play-btn；要暂停点 #play（若站点有）否则 #pause。
     function togglePlayback(video) {
         if (!video) return;
         const wantPlay = Boolean(video.paused);
@@ -1569,14 +1571,12 @@
         // 清掉页面中间可能残留的暂停/播放 icon
         container.querySelectorAll('.zsxq-flash-icon, .zsxq-center-play').forEach((el) => el.remove());
 
-        const playCtrl = container.querySelector('#play');
-        const pauseCtrl = container.querySelector('#pause');
         const centerBtn = container.querySelector('#play-btn');
+        const barToggle = container.querySelector('#pause') || container.querySelector('#play');
 
-        // 要播放 → 点播放控件；要暂停 → 点暂停控件
         const target = wantPlay
-            ? (playCtrl || centerBtn)
-            : pauseCtrl;
+            ? (centerBtn || barToggle)
+            : barToggle;
 
         if (target) {
             try { target.click(); } catch (_) { /* ignore */ }
